@@ -66,10 +66,11 @@
   .page-btn:disabled{ opacity:0.35; cursor:default; }
   .page-status{ font-size:11px; color:var(--paper-faint); }
 
-  .overlay{ position:fixed; inset:0; z-index:50; background:rgba(10,9,6,0.92); display:none; align-items:center; justify-content:center; padding:4vh 4vw; }
+  .overlay{ position:fixed; inset:0; z-index:50; background:rgba(10,9,6,0.92); display:none; align-items:center; justify-content:center; padding:3vh 3vw; }
   .overlay.open{ display:flex; }
-  .detail{ max-width:1100px; width:100%; display:grid; grid-template-columns:1.3fr 0.7fr; background:var(--ink-2); border:1px solid var(--hair-strong); max-height:90vh; overflow:hidden; }
-  @media (max-width:760px){ .detail{ grid-template-columns:1fr; grid-template-rows:56vh auto; max-height:94vh; } }
+  .detail{ width:96vw; max-width:2600px; height:94vh; display:grid; grid-template-columns:2.2fr 0.35fr; background:var(--ink-2); border:1px solid var(--hair-strong); overflow:hidden; }
+  @media (max-width:760px){ .detail{ grid-template-columns:1fr; grid-template-rows:1fr auto; width:100vw; height:100vh; } }
+  @media (max-width:760px) and (orientation:landscape){ .detail{ grid-template-rows:1fr; } .detail-info{ display:none; } }
   .plate-stage{
     position:relative; overflow:hidden; background:var(--ink);
     min-height:340px;
@@ -103,6 +104,8 @@
     transition:background 0.2s ease, border-color 0.2s ease;
   }
   .stage-btn:hover{ background:rgba(21,19,15,0.85); border-color:var(--gold); color:var(--gold); }
+  .stage-hint{ display:none; align-self:center; font-size:10px; color:var(--paper-dim); background:rgba(21,19,15,0.55); border:1px solid var(--hair-strong); padding:8px 10px; }
+  @media (max-width:760px) and (orientation:portrait){ .stage-hint{ display:inline-block; } }
   .stage-nav{
     position:absolute; top:50%; transform:translateY(-50%);
     width:40px; height:40px; border-radius:50%;
@@ -208,17 +211,13 @@
         <button class="stage-btn" id="zoom-out-btn" aria-label="Zoom out">&#8722;</button>
         <button class="stage-btn" id="zoom-in-btn" aria-label="Zoom in">&#43;</button>
         <button class="stage-btn" id="rotate-btn" aria-label="Rotate">&#8635;</button>
+        <span class="stage-hint mono">Rotate phone for full screen</span>
       </div>
     </div>
     <div class="detail-info">
       <button class="detail-close mono" id="close-btn">Close ✕</button>
       <div class="detail-num mono" id="detail-num">Plate I</div>
       <div class="detail-title" id="detail-title">Untitled</div>
-      <div class="detail-rows">
-        <div class="detail-row"><span class="k mono">Reference</span><span class="v" id="row-ref">—</span></div>
-        <div class="detail-row"><span class="k mono">Medium</span><span class="v">Wood / steel engraving</span></div>
-        <div class="detail-row"><span class="k mono">Filename</span><span class="v" id="row-file">—</span></div>
-      </div>
     </div>
   </div>
 </div>
@@ -419,8 +418,6 @@
     stageImg.alt = p.title;
     document.getElementById('detail-num').textContent = 'Plate ' + p.num;
     document.getElementById('detail-title').textContent = p.title;
-    document.getElementById('row-ref').textContent = p.ref || '—';
-    document.getElementById('row-file').textContent = p.filename;
   }
   function openDetail(p){
     currentIndex = plates.indexOf(p);
