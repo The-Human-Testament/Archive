@@ -26,7 +26,7 @@
   img{ display:block; max-width:100%; }
 
   .hero{ position:relative; height:100vh; min-height:560px; overflow:hidden; display:flex; align-items:flex-end; border-bottom:1px solid var(--hair); }
-  .slide{ position:absolute; inset:0; opacity:0; transition:opacity 2.2s ease; }
+  .slide{ position:absolute; inset:0; opacity:0; transition:opacity 3s ease-in-out; }
   .slide img{ width:100%; height:100%; object-fit:cover; filter:saturate(0.85) brightness(0.75); }
   .slide.active{ opacity:1; }
   .hero::after{ content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(21,19,15,0.1) 0%, rgba(21,19,15,0.6) 62%, var(--ink) 100%); pointer-events:none; }
@@ -60,12 +60,49 @@
   .plate-name{ font-size:14px; color:var(--paper-dim); font-style:italic; font-family:'Fraunces', serif; }
   .plate-status{ font-size:10px; color:var(--paper-faint); margin-top:0.5rem; }
 
+  .page-nav{ display:flex; align-items:center; justify-content:center; gap:1.4rem; margin-top:2.4rem; }
+  .page-btn{ background:none; border:1px solid var(--hair-strong); color:var(--paper-dim); font-size:11px; padding:8px 16px; cursor:pointer; transition:border-color 0.2s ease, color 0.2s ease; }
+  .page-btn:hover:not(:disabled){ border-color:var(--gold); color:var(--gold); }
+  .page-btn:disabled{ opacity:0.35; cursor:default; }
+  .page-status{ font-size:11px; color:var(--paper-faint); }
+
   .overlay{ position:fixed; inset:0; z-index:50; background:rgba(10,9,6,0.92); display:none; align-items:center; justify-content:center; padding:4vh 4vw; }
   .overlay.open{ display:flex; }
-  .detail{ max-width:920px; width:100%; display:grid; grid-template-columns:1.1fr 0.9fr; background:var(--ink-2); border:1px solid var(--hair-strong); max-height:88vh; overflow:auto; }
-  @media (max-width:760px){ .detail{ grid-template-columns:1fr; } }
-  .plate-stage{ position:relative; aspect-ratio:3/4; overflow:hidden; background:var(--ink); }
-  .plate-stage img{ width:100%; height:100%; object-fit:cover; }
+  .detail{ max-width:1100px; width:100%; display:grid; grid-template-columns:1.3fr 0.7fr; background:var(--ink-2); border:1px solid var(--hair-strong); max-height:90vh; overflow:hidden; }
+  @media (max-width:760px){ .detail{ grid-template-columns:1fr; grid-template-rows:56vh auto; max-height:94vh; } }
+  .plate-stage{
+    position:relative; overflow:hidden; background:var(--ink);
+    min-height:340px;
+    display:flex; align-items:center; justify-content:center;
+    touch-action:none;
+  }
+  .plate-stage-inner{
+    width:100%; height:100%;
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden;
+  }
+  .plate-stage img{
+    max-width:100%; max-height:100%;
+    width:auto; height:auto;
+    object-fit:contain;
+    user-select:none; -webkit-user-drag:none;
+    transition:transform 0.15s ease-out;
+    cursor:grab;
+  }
+  .plate-stage img.zoomed{ cursor:grab; }
+  .plate-stage img.dragging{ cursor:grabbing; transition:none; }
+  .stage-toolbar{
+    position:absolute; left:12px; bottom:12px; z-index:3;
+    display:flex; gap:6px;
+  }
+  .stage-btn{
+    width:36px; height:36px; border-radius:50%;
+    background:rgba(21,19,15,0.6); border:1px solid var(--hair-strong);
+    color:var(--paper); font-size:15px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:background 0.2s ease, border-color 0.2s ease;
+  }
+  .stage-btn:hover{ background:rgba(21,19,15,0.85); border-color:var(--gold); color:var(--gold); }
   .stage-nav{
     position:absolute; top:50%; transform:translateY(-50%);
     width:40px; height:40px; border-radius:50%;
@@ -126,6 +163,7 @@
     <span class="index-count mono" id="plate-count">— photographed</span>
   </div>
   <div class="grid" id="plate-grid"></div>
+  <div class="page-nav" id="page-nav"></div>
 </section>
 
 
@@ -161,9 +199,16 @@
 <div class="overlay" id="overlay">
   <div class="detail">
     <div class="plate-stage" id="stage">
-      <img id="stage-img" alt="">
+      <div class="plate-stage-inner">
+        <img id="stage-img" alt="">
+      </div>
       <button class="stage-nav prev" id="prev-btn" aria-label="Previous plate">&#8249;</button>
       <button class="stage-nav next" id="next-btn" aria-label="Next plate">&#8250;</button>
+      <div class="stage-toolbar">
+        <button class="stage-btn" id="zoom-out-btn" aria-label="Zoom out">&#8722;</button>
+        <button class="stage-btn" id="zoom-in-btn" aria-label="Zoom in">&#43;</button>
+        <button class="stage-btn" id="rotate-btn" aria-label="Rotate">&#8635;</button>
+      </div>
     </div>
     <div class="detail-info">
       <button class="detail-close mono" id="close-btn">Close ✕</button>
@@ -174,7 +219,6 @@
         <div class="detail-row"><span class="k mono">Medium</span><span class="v">Wood / steel engraving</span></div>
         <div class="detail-row"><span class="k mono">Filename</span><span class="v" id="row-file">—</span></div>
       </div>
-      <p class="detail-note">Title and reference above are read straight from the filename — no separate database or form to fill in.</p>
     </div>
   </div>
 </div>
@@ -211,7 +255,7 @@
     const filenames = await res.json();
     plates = filenames
       .map(f => ({ ...parseFilename(f), src: 'images/' + encodeURIComponent(f) }))
-      .sort((a, b) => a.filename.localeCompare(b.filename));
+      .sort((a, b) => (parseFloat(a.num) || 0) - (parseFloat(b.num) || 0));
     buildPage();
   }
   loadPlates().catch(err => {
@@ -249,29 +293,130 @@
     slides[sIdx].classList.remove('active');
     sIdx = (sIdx + 1) % slides.length;
     slides[sIdx].classList.add('active');
-  }, 4200);
+  }, 7200);
 
-  // Plate index
+  // Plate index (paginated so large collections stay fast to render)
   const grid = document.getElementById('plate-grid');
+  const pageNav = document.getElementById('page-nav');
+  const PAGE_SIZE = 24;
+  let page = 0;
+  const pageCount = Math.max(1, Math.ceil(plates.length / PAGE_SIZE));
+
   document.getElementById('plate-count').textContent = plates.length + ' photographed';
-  plates.forEach(p => {
-    const card = document.createElement('div');
-    card.className = 'plate-card';
-    card.innerHTML = `
-      <div class="plate-frame"><img src="${p.src}" alt="${p.title}"></div>
-      <div class="plate-num mono">Plate ${p.num}</div>
-      <div class="plate-name">${p.title}</div>
-      <div class="plate-status mono">${p.ref || 'Reference pending'}</div>`;
-    card.addEventListener('click', () => openDetail(p));
-    grid.appendChild(card);
-  });
+
+  function renderGrid(){
+    grid.innerHTML = '';
+    const start = page * PAGE_SIZE;
+    const pagePlates = plates.slice(start, start + PAGE_SIZE);
+    pagePlates.forEach(p => {
+      const card = document.createElement('div');
+      card.className = 'plate-card';
+      card.innerHTML = `
+        <div class="plate-frame"><img src="${p.src}" alt="${p.title}" loading="lazy"></div>
+        <div class="plate-num mono">Plate ${p.num}</div>
+        <div class="plate-name">${p.title}</div>
+        <div class="plate-status mono">${p.ref || 'Reference pending'}</div>`;
+      card.addEventListener('click', () => openDetail(p));
+      grid.appendChild(card);
+    });
+    renderPageNav();
+    window.scrollTo({ top: grid.offsetTop - 100, behavior: 'smooth' });
+  }
+
+  function renderPageNav(){
+    if(pageCount <= 1){ pageNav.innerHTML = ''; return; }
+    pageNav.innerHTML = `
+      <button class="page-btn mono" id="page-prev" ${page === 0 ? 'disabled' : ''}>&#8249; Prev</button>
+      <span class="page-status mono">Page ${page + 1} of ${pageCount}</span>
+      <button class="page-btn mono" id="page-next" ${page === pageCount - 1 ? 'disabled' : ''}>Next &#8250;</button>`;
+    document.getElementById('page-prev')?.addEventListener('click', () => { if(page > 0){ page--; renderGrid(); } });
+    document.getElementById('page-next')?.addEventListener('click', () => { if(page < pageCount - 1){ page++; renderGrid(); } });
+  }
+
+  renderGrid();
 
   // Detail overlay
   const overlay = document.getElementById('overlay');
+  const stageImg = document.getElementById('stage-img');
   let currentIndex = 0;
+
+  // --- zoom / rotate / pan state ---
+  let zoom = 1, rotation = 0, panX = 0, panY = 0;
+  const ZOOM_MIN = 1, ZOOM_MAX = 4, ZOOM_STEP = 0.5;
+
+  function applyTransform(withTransition){
+    stageImg.style.transition = withTransition ? 'transform 0.15s ease-out' : 'none';
+    stageImg.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom}) rotate(${rotation}deg)`;
+    stageImg.classList.toggle('zoomed', zoom > 1);
+  }
+  function resetTransform(){
+    zoom = 1; rotation = 0; panX = 0; panY = 0;
+    applyTransform(false);
+  }
+  function setZoom(next){
+    zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
+    if(zoom === 1){ panX = 0; panY = 0; }
+    applyTransform(true);
+  }
+
+  document.getElementById('zoom-in-btn').addEventListener('click', () => setZoom(zoom + ZOOM_STEP));
+  document.getElementById('zoom-out-btn').addEventListener('click', () => setZoom(zoom - ZOOM_STEP));
+  document.getElementById('rotate-btn').addEventListener('click', () => {
+    rotation = (rotation + 90) % 360;
+    applyTransform(true);
+  });
+
+  // double-click / double-tap to toggle zoom
+  stageImg.addEventListener('dblclick', () => setZoom(zoom > 1 ? 1 : 2.5));
+
+  // mouse drag to pan when zoomed
+  let dragging = false, dragStartX = 0, dragStartY = 0, panStartX = 0, panStartY = 0;
+  stageImg.addEventListener('mousedown', (e) => {
+    if(zoom <= 1) return;
+    dragging = true;
+    stageImg.classList.add('dragging');
+    dragStartX = e.clientX; dragStartY = e.clientY;
+    panStartX = panX; panStartY = panY;
+  });
+  window.addEventListener('mousemove', (e) => {
+    if(!dragging) return;
+    panX = panStartX + (e.clientX - dragStartX);
+    panY = panStartY + (e.clientY - dragStartY);
+    applyTransform(false);
+  });
+  window.addEventListener('mouseup', () => { dragging = false; stageImg.classList.remove('dragging'); });
+
+  // touch: single-finger pan, two-finger pinch to zoom
+  let touchStartDist = 0, touchStartZoom = 1;
+  let touchStartX = 0, touchStartY = 0, touchPanStartX = 0, touchPanStartY = 0;
+  function touchDist(t){
+    const dx = t[0].clientX - t[1].clientX, dy = t[0].clientY - t[1].clientY;
+    return Math.hypot(dx, dy);
+  }
+  document.getElementById('stage').addEventListener('touchstart', (e) => {
+    if(e.touches.length === 2){
+      touchStartDist = touchDist(e.touches);
+      touchStartZoom = zoom;
+    } else if(e.touches.length === 1 && zoom > 1){
+      touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY;
+      touchPanStartX = panX; touchPanStartY = panY;
+    }
+  }, { passive: true });
+  document.getElementById('stage').addEventListener('touchmove', (e) => {
+    if(e.touches.length === 2){
+      const dist = touchDist(e.touches);
+      setZoom(touchStartZoom * (dist / touchStartDist));
+    } else if(e.touches.length === 1 && zoom > 1){
+      panX = touchPanStartX + (e.touches[0].clientX - touchStartX);
+      panY = touchPanStartY + (e.touches[0].clientY - touchStartY);
+      applyTransform(false);
+    }
+  }, { passive: true });
+
   function renderDetail(p){
-    document.getElementById('stage-img').src = p.src;
-    document.getElementById('stage-img').alt = p.title;
+    resetTransform();
+    stageImg.src = p.src;
+    stageImg.alt = p.title;
     document.getElementById('detail-num').textContent = 'Plate ' + p.num;
     document.getElementById('detail-title').textContent = p.title;
     document.getElementById('row-ref').textContent = p.ref || '—';
