@@ -104,8 +104,9 @@
     transition:background 0.2s ease, border-color 0.2s ease;
   }
   .stage-btn:hover{ background:rgba(21,19,15,0.85); border-color:var(--gold); color:var(--gold); }
-  .stage-hint{ display:none; align-self:center; font-size:10px; color:var(--paper-dim); background:rgba(21,19,15,0.55); border:1px solid var(--hair-strong); padding:8px 10px; }
+  .stage-hint{ display:none; font-size:10px; color:var(--paper-faint); border:1px solid var(--hair-strong); padding:6px 8px; }
   @media (max-width:760px) and (orientation:portrait){ .stage-hint{ display:inline-block; } }
+  .detail-info-top{ display:flex; justify-content:space-between; align-items:center; gap:0.6rem; }
   .stage-nav{
     position:absolute; top:50%; transform:translateY(-50%);
     width:40px; height:40px; border-radius:50%;
@@ -260,11 +261,13 @@
         <button class="stage-btn" id="zoom-out-btn" aria-label="Zoom out">&#8722;</button>
         <button class="stage-btn" id="zoom-in-btn" aria-label="Zoom in">&#43;</button>
         <button class="stage-btn" id="rotate-btn" aria-label="Rotate">&#8635;</button>
-        <span class="stage-hint mono">Rotate phone for full screen</span>
       </div>
     </div>
     <div class="detail-info">
-      <button class="detail-close mono" id="close-btn">Close ✕</button>
+      <div class="detail-info-top">
+        <span class="stage-hint mono">Rotate phone for full screen</span>
+        <button class="detail-close mono" id="close-btn">Close ✕</button>
+      </div>
       <div class="detail-num mono" id="detail-num">Plate I</div>
       <div class="detail-title" id="detail-title">Untitled</div>
     </div>
@@ -325,16 +328,43 @@
     }
   });
 
+  // Shared modal/back-button handling: pushes a history entry when a modal
+  // opens so the mobile back button (or Android gesture) closes the modal
+  // instead of leaving the page, matching Escape on desktop.
+  let openModalName = null;
+  function openModal(name, el){
+    if(openModalName === null){
+      history.pushState({ modal: name }, '');
+    }
+    openModalName = name;
+    el.classList.add('open');
+  }
+  function closeModal(el){
+    el.classList.remove('open');
+    if(openModalName !== null){
+      openModalName = null;
+      history.back();
+    }
+  }
+  window.addEventListener('popstate', () => {
+    if(openModalName === 'about'){
+      document.getElementById('about-overlay').classList.remove('open');
+    } else if(openModalName === 'detail'){
+      document.getElementById('overlay').classList.remove('open');
+    }
+    openModalName = null;
+  });
+
   // About overlay
   const aboutOverlay = document.getElementById('about-overlay');
   document.getElementById('about-open-btn').addEventListener('click', () => {
     brandPopover.classList.remove('open');
-    aboutOverlay.classList.add('open');
+    openModal('about', aboutOverlay);
   });
-  document.getElementById('about-close-btn').addEventListener('click', () => aboutOverlay.classList.remove('open'));
-  aboutOverlay.addEventListener('click', (e) => { if(e.target === aboutOverlay) aboutOverlay.classList.remove('open'); });
+  document.getElementById('about-close-btn').addEventListener('click', () => closeModal(aboutOverlay));
+  aboutOverlay.addEventListener('click', (e) => { if(e.target === aboutOverlay) closeModal(aboutOverlay); });
   document.addEventListener('keydown', (e) => {
-    if(e.key === 'Escape' && aboutOverlay.classList.contains('open')) aboutOverlay.classList.remove('open');
+    if(e.key === 'Escape' && aboutOverlay.classList.contains('open')) closeModal(aboutOverlay);
   });
 
   function buildPage(){
@@ -442,6 +472,13 @@
   // double-click / double-tap to toggle zoom
   stageImg.addEventListener('dblclick', () => setZoom(zoom > 1 ? 1 : 2.5));
 
+  // scroll wheel to zoom in/out (desktop)
+  document.getElementById('stage').addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const step = e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP;
+    setZoom(zoom + step);
+  }, { passive: false });
+
   // mouse drag to pan when zoomed
   let dragging = false, dragStartX = 0, dragStartY = 0, panStartX = 0, panStartY = 0;
   stageImg.addEventListener('mousedown', (e) => {
@@ -496,7 +533,7 @@
   function openDetail(p){
     currentIndex = plates.indexOf(p);
     renderDetail(p);
-    overlay.classList.add('open');
+    openModal('detail', overlay);
   }
   function showOffset(delta){
     currentIndex = (currentIndex + delta + plates.length) % plates.length;
@@ -508,10 +545,10 @@
     if(!overlay.classList.contains('open')) return;
     if(e.key === 'ArrowLeft') showOffset(-1);
     if(e.key === 'ArrowRight') showOffset(1);
-    if(e.key === 'Escape') overlay.classList.remove('open');
+    if(e.key === 'Escape') closeModal(overlay);
   });
-  document.getElementById('close-btn').addEventListener('click', () => overlay.classList.remove('open'));
-  overlay.addEventListener('click', (e) => { if(e.target === overlay) overlay.classList.remove('open'); });
+  document.getElementById('close-btn').addEventListener('click', () => closeModal(overlay));
+  overlay.addEventListener('click', (e) => { if(e.target === overlay) closeModal(overlay); });
   } // end buildPage
 </script>
 </body>
